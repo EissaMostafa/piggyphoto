@@ -308,6 +308,11 @@ class camera(object):
         else:
             return (path.folder, path.name)
 
+    #Added by MEISSA
+    def trigger_capture_image(self):
+        ans = gp.gp_camera_trigger_capture(self._cam, context)
+        check(ans)
+
     def capture_preview(self, destpath = None):
         path = CameraFilePath()
         cfile = cameraFile()
@@ -359,6 +364,9 @@ class camera(object):
         cfg = self.config
         self._list_config(cfg, cfglist, cfg.name)
         return cfglist
+
+    def set_single_config(self,conf_name,widget):
+        check(gp.gp_camera_set_single_config(self._cam, ctypes.c_char_p(conf_name),widget._w,context))
 
     def ptp_canon_eos_requestdevicepropvalue(self, prop):
         params = ctypes.c_void_p(self._cam.value + 12)
@@ -615,7 +623,8 @@ class cameraWidget(object):
     id = property(_get_id, None)
 
     def _set_changed(self, changed):
-        check(gp.gp_widget_set_changed(self._w, str(changed)))
+        #MEISSA: why str(changed)? it suppose to be int
+        check(gp.gp_widget_set_changed(self._w, changed))
     def _get_changed(self):
         return gp.gp_widget_changed(self._w)
     changed = property(_get_changed, _set_changed)
@@ -651,20 +660,25 @@ class cameraWidget(object):
         ans = gp.gp_widget_get_value(self._w, PTR(value))
         if self.type in [GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT]:
             value = ctypes.cast(value.value, ctypes.c_char_p)
+            retval=value.value
         elif self.type == GP_WIDGET_RANGE:
-            value = ctypes.cast(value.value, ctypes.c_float_p)
+            #MEISSA: Modification as c_float_p isn't part of ctypes lib
+            #value = ctypes.cast(value.value, ctypes.c_float_p)
+            value=ctypes.cast(value, ctypes.POINTER(ctypes.c_float))
+            return value
         elif self.type in [GP_WIDGET_TOGGLE, GP_WIDGET_DATE]:
             #value = ctypes.cast(value.value, ctypes.c_int_p)
-            pass
+            return None
         else:
             return None
         check(ans)
-        return value.value
+        #return value.value
     def _set_value(self, value):
         if self.type in (GP_WIDGET_MENU, GP_WIDGET_RADIO, GP_WIDGET_TEXT):
             value = ctypes.c_char_p(value)
         elif self.type == GP_WIDGET_RANGE:
-            value = ctypes.c_float_p(value) # this line not tested
+            #MEISSA: change for a bug fix
+            value = PTR(ctypes.c_float(value)) # this line not tested
         elif self.type in (GP_WIDGET_TOGGLE, GP_WIDGET_DATE):
             value = PTR(ctypes.c_int(value))
         else:
@@ -696,6 +710,8 @@ class cameraWidget(object):
         w = cameraWidget()
         check(gp.gp_widget_get_child_by_id(self._w, int(id), PTR(w._w)))
         return w
+
+
 
     def get_child_by_name(self, name):
         w = cameraWidget()
